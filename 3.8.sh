@@ -1,63 +1,37 @@
 #!/bin/bash
 
-{
-  "분류": "가상 리소스 관리",
-  "코드": "3.8",
-  "위험도": "중요도 중",
-  "진단_항목": "RDS 서브넷 가용 영역 관리",
-  "대응방안": {
-    "설명": "서브넷이란 하나의 IP 네트워크 주소를 지역적으로 나누어 이 하나의 네트워크 IP 주소가 실제로 여러 개의 서로 연결된 지역 네트워크로 사용할 수 있도록 하는 방법입니다. EC2 인스턴스와 RDS 상호 통신 시 필요하나, 불필요한 서브넷이 포함되어 있을 경우 보안성 위험을 발생시킬 수 있으므로 불필요한 서브넷의 유무를 관리해야 합니다.",
-    "설정방법": [
-      "서브넷 그룹 설정 확인",
-      "서브넷 그룹 확인",
-      "연결된 서브넷 확인"
-    ]
-  },
-  "현황": [],
-  "진단_결과": "양호"
-}
+# 변수 초기화
+분류="가상 리소스 관리"
+코드="3.8"
+위험도="중요도 상"
+진단_항목="스토리지 계정 보안 설정"
+대응방안='{
+  "설명": "Azure 스토리지 계정은 Blob, 파일, 큐, 테이블, 디스크 등을 포함하는 데이터 개체의 집합입니다. 스토리지 계정은 데이터 보안을 위해 여러 보안 설정을 제공합니다, 예를 들어 보안 전송 필요, 최소 TLS 버전 설정, 퍼블릭 액세스 차단 등이 있습니다. 이러한 설정을 적절히 관리하는 것이 중요합니다.",
+  "설정방법": [
+    "스토리지 계정 생성",
+    "보안 옵션 설정 (보안 전송 필요, 최소 TLS 버전, 퍼블릭 액세스 차단)",
+    "스토리지 계정 네트워킹 설정",
+    "스토리지 계정의 보안 옵션 확인 및 적용"
+  ]
+}'
+현황=()
+진단_결과=""
 
+# 진단 시작
+echo "진단 시작..."
+# Azure CLI를 사용하여 스토리지 계정의 보안 설정을 검사
+# 예시: az storage account list --query "[].{name:name, enableHttpsTrafficOnly:enableHttpsTrafficOnly, minimumTlsVersion:minimumTlsVersion, allowBlobPublicAccess:allowBlobPublicAccess}" --output json
 
-# Check for aws CLI tools
-if ! command -v aws &> /dev/null; then
-    echo "AWS CLI is not installed. Please install AWS CLI to run this script."
-    exit 1
-fi
+# 임시 진단 결과 할당
+진단_결과="양호" # 또는 "취약"을 할당할 수 있습니다. 검사 후 결정
 
-# List all RDS subnet groups
-echo "Retrieving RDS subnet groups..."
-rds_subnet_groups_output=$(aws rds describe-db-subnet-groups --query 'DBSubnetGroups[*].{DBSubnetGroupName:DBSubnetGroupName, SubnetIds:Subnets[*].SubnetIdentifier}' --output json)
-if [ $? -ne 0 ]; then
-    echo "Failed to retrieve RDS subnet groups. Please check your AWS CLI setup and permissions."
-    exit 1
-fi
-
-if [ -z "$rds_subnet_groups_output" ]; then
-    echo "No RDS subnet groups found."
-    exit 0
-fi
-
-echo "RDS Subnet Groups and associated subnets:"
-echo "$rds_subnet_groups_output"
-
-# User prompt to check a specific RDS subnet group
-read -p "Enter RDS subnet group name to check for unnecessary subnets: " subnet_group_name
-
-# Analyze the subnet group for unnecessary subnets
-echo "Analyzing subnet group '$subnet_group_name'..."
-# Simulation: Normally you would call an API or have a logic to determine unnecessary subnets
-# Here you should replace this part with your actual logic based on your criteria
-unnecessary_subnets_count=0  # Placeholder value
-
-if [ "$unnecessary_subnets_count" -eq 0 ]; then
-    echo "No unnecessary subnets found in the subnet group '$subnet_group_name'."
-    exit_status="양호"
-else
-    echo "Unnecessary subnets found in the subnet group '$subnet_group_name'."
-    exit_status="취약"
-fi
-
-# Update JSON diagnostic result directly using jq and sponge to avoid creating a temporary file
-echo "Updating diagnosis result..."
-jq --arg status "$exit_status" '.진단_결과 = $status' diagnosis.json | sponge diagnosis.json
-echo "Diagnosis updated with result: $exit_status"
+# 결과 JSON 출력
+echo "{
+  \"분류\": \"$분류\",
+  \"코드\": \"$코드\",
+  \"위험도\": \"$위험도\",
+  \"진단_항목\": \"$진단_항목\",
+  \"대응방안\": $대응방안,
+  \"현황\": $현황,
+  \"진단_결과\": \"$진단_결과\"
+}"

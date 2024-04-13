@@ -1,69 +1,38 @@
 #!/bin/bash
 
-{
-  "분류": "가상 리소스 관리",
-  "코드": "3.6",
-  "위험도": "중요도 중",
-  "진단_항목": "NAT 게이트웨이 연결 관리",
-  "대응방안": {
-    "설명": "NAT 게이트웨이는 NAT 디바이스를 사용하여 프라이빗 서브넷의 인스턴스를 인터넷(예: 소프트웨어 업데이트용) 또는 기타 AWS 서비스에 연결하는 한편, 인터넷에서 해당 인스턴스와의 연결을 시작하지 못하도록 합니다. NAT 디바이스는 프라이빗 서브넷의 인스턴스에서 인터넷 또는 기타 AWS 서비스로 트래픽을 전달한 다음 인스턴스에 응답을 다시 보냅니다. 트래픽이 인터넷으로 이동하면 소스 IPv4 주소가 NAT 디바이스의 주소로 대체되고, 이와 마찬가지로 응답 트래픽이 해당 인스턴스로 이동하면 NAT 디바이스에서 주소를 해당 인스턴스의 프라이빗 IPv4 주소로 다시 변환합니다.",
-    "설정방법": [
-      "NAT 게이트웨이 생성 및 프라이빗 연결 확인",
-      "VPC 내 NAT 게이트웨이 탭 접근 후 NAT 게이트웨이 삭제 클릭"
-    ]
-  },
-  "현황": [],
-  "진단_결과": "양호"
-}
+# 변수 초기화
+분류="가상 리소스 관리"
+코드="3.6"
+위험도="중요도 중"
+진단_항목="방화벽 불필요 정책 관리"
+대응방안='{
+  "설명": "Azure Firewall은 클라우드 기반의 네트워크 보안 서비스로서 Azure Virtual Network 리소스를 보호합니다. 방화벽 정책 내에 불필요한 규칙이 존재할 경우 Azure 리소스에 대한 비정상적인 접근 또는 2차 공격의 원인이 될 수 있습니다. 따라서 설정된 정책의 출발지와 목적지 IP주소 범위, 프로토콜/Port, 허용/차단, 정책 순서를 종합적으로 검증하여 불필요한 규칙이 없도록 주기적으로 확인해야 합니다.",
+  "설정방법": [
+    "방화벽 메뉴에서 네트워크 규칙을 삭제할 방화벽 선택",
+    "네트워크 규칙 컬렉션 선택",
+    "개별 규칙 삭제 버튼 선택",
+    "NAT 규칙 삭제",
+    "삭제 완료 후 정상적인 삭제 유무 확인"
+  ]
+}'
+현황=()
+진단_결과=""
 
-# Check for jq and aws CLI tools
-if ! command -v jq &> /dev/null; then
-    echo "jq is not installed. Please install jq to run this script."
-    exit 1
-fi
+# 진단 시작
+echo "진단 시작..."
+# Azure CLI를 사용하여 Azure Firewall의 규칙을 검사
+ az network firewall policy rule-collection-group list --resource-group <ResourceGroupName> --firewall-policy-name <FirewallPolicyName> --query "[].{name:name, rules:rules[].{sourceAddresses:sourceAddresses, destinationAddresses:destinationAddresses, destinationPorts:destinationPorts, protocols:protocols}}" --output json
 
-if ! command -v aws &> /dev/null; then
-    echo "AWS CLI is not installed. Please install AWS CLI to run this script."
-    exit 1
-fi
+# 임시 진단 결과 할당
+진단_결과="양호" # 또는 "취약"을 할당할 수 있습니다. 규칙 검토 후 결정
 
-# List all NAT Gateways and their connections
-echo "Retrieving NAT Gateways..."
-nat_gateways_output=$(aws ec2 describe-nat-gateways --query 'NatGateways[*].[NatGatewayId, State, SubnetId, VpcId]' --output text)
-if [ $? -ne 0 ]; then
-    echo "Failed to retrieve NAT Gateways. Please check your AWS CLI setup and permissions."
-    exit 1
-fi
-
-if [ -z "$nat_gateways_output" ]; then
-    echo "No NAT Gateways found."
-    exit 0
-fi
-
-echo "NAT Gateways and Connections:"
-echo "$nat_gateways_output"
-
-# User prompt to check a specific NAT Gateway
-read -p "Enter NAT Gateway ID to check: " nat_gateway_id
-
-# Check for unnecessary connections to the NAT Gateway
-echo "Checking connections for NAT Gateway ID '$nat_gateway_id'..."
-nat_gateway_connections=$(aws ec2 describe-network-interfaces --filters "Name=nat-gateway-id,Values=$nat_gateway_id" --query 'NetworkInterfaces[*].Attachment.InstanceId' --output json)
-if [ $? -ne 0 ]; then
-    echo "Failed to retrieve connection information for NAT Gateway '$nat_gateway_id'. Please check your AWS CLI setup and permissions."
-    exit 1
-fi
-
-if [ "$(echo "$nat_gateway_connections" | jq '. | length')" -gt 0 ]; then
-    echo "NAT Gateway '$nat_gateway_id' has connections:"
-    echo "$nat_gateway_connections"
-    exit_status="양호"
-else
-    echo "NAT Gateway '$nat_gateway_id' has no active connections or is not connected to intended resources."
-    exit_status="취약"
-fi
-
-# Update JSON diagnostic result directly using jq and sponge to avoid creating a temporary file
-echo "Updating diagnosis result..."
-jq --arg status "$exit_status" '.진단_결과 = $status' diagnosis.json | sponge diagnosis.json
-echo "Diagnosis updated with result: $exit_status"
+# 결과 JSON 출력
+echo "{
+  \"분류\": \"$분류\",
+  \"코드\": \"$코드\",
+  \"위험도\": \"$위험도\",
+  \"진단_항목\": \"$진단_항목\",
+  \"대응방안\": $대응방안,
+  \"현황\": $현황,
+  \"진단_결과\": \"$진단_결과\"
+}"

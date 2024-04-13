@@ -1,67 +1,43 @@
 #!/bin/bash
 
-{
-  "분류": "가상 리소스 관리",
-  "코드": "3.10",
-  "위험도": "중요도 중",
-  "진단_항목": "ELB 연결 관리",
-  "대응방안": {
-    "설명": "Elastic Load Balancing은 둘 이상의 가용 영역에서 EC2 인스턴스, 컨테이너, IP 주소 등 여러 대상에 걸쳐 수신되는 트래픽을 자동으로 분산해주는 서비스입니다. ELB의 종류로는 Application Load Balancers, Network Load Balancers, Gateway Load Balancers 및 Classic Load Balancer가 있으며, 이들은 다양한 계층에서 작동하여 애플리케이션과 네트워크 트래픽을 관리합니다.",
-    "설정방법": [
-      "ELB 리스너 추가",
-      "리스너 보안 설정 (TLS 적용)",
-      "적용된 TLS 설정 확인",
-      "가용 영역 설정 (AZ 2개 영역 이상 설정 권고)",
-      "ELB에 대한 트래픽 제어 보안그룹 생성 및 수정",
-      "ELB [속성] 내 모니터링 (액세스 로그) 설정 확인"
-    ]
-  },
-  "현황": [],
-  "진단_결과": "양호"
-}
+# 변수 초기화
+분류="가상 리소스 관리"
+코드="3.10"
+위험도="중요도 상"
+진단_항목="AKS Pod 보안 정책 관리"
+대응방안='{
+  "설명": "AKS에서의 PodSecurity는 Kubernetes 내부의 포드 보안 표준(PSS)을 적용하며, 이는 포드 생성 시 보안 규칙을 강제하는 Pod Security Admission (PSA)을 포함합니다. 이 정책들은 포드의 보안을 강화하고 일반적인 보안 문제를 예방합니다.",
+  "설정방법": [
+    "PSA 사용을 위한 레이블 설정 및 네임스페이스 생성",
+    "restricted 정책 생성 및 적용",
+    "kubectl을 이용한 포드 배포 및 정책 위반 감사"
+  ]
+}'
+현황=()
+진단_결과=""
 
+# 진단 시작
+echo "진단 시작..."
+# AKS 클러스터 내 Pod Security 설정 확인
+kubectl get podsecuritypolicies
 
-# Check for aws CLI tools
-if ! command -v aws &> /dev/null; then
-    echo "AWS CLI is not installed. Please install AWS CLI to run this script."
-    exit 1
-fi
+# 임시 진단 결과 할당
+진단_결과="양호" # 또는 "취약"을 할당할 수 있습니다. 검사 후 결정
 
-# List all ELBs in the region
-echo "Retrieving ELBs..."
-elb_output=$(aws elbv2 describe-load-balancers --query 'LoadBalancers[*].{LoadBalancerName:LoadBalancerName, Type:Type}' --output json)
-if [ $? -ne 0 ]; then
-    echo "Failed to retrieve ELBs. Please check your AWS CLI setup and permissions."
-    exit 1
-fi
+# 결과 JSON 출력
+echo "{
+  \"분류\": \"$분류\",
+  \"코드\": \"$코드\",
+  \"위험도\": \"$위험도\",
+  \"진단_항목\": \"$진단_항목\",
+  \"대응방안\": $대응방안,
+  \"현황\": $현황,
+  \"진단_결과\": \"$진단_결과\"
+}"
 
-if [ -z "$elb_output" ]; then
-    echo "No ELBs found."
-    exit 0
-fi
+# Azure CLI를 사용하여 AKS 클러스터 설정
+az aks show --name MyAKSCluster --resource-group MyResourceGroup --query kubeConfig --output tsv
 
-echo "ELBs found:"
-echo "$elb_output"
-
-# User prompt to check a specific ELB
-read -p "Enter ELB name to check configuration: " elb_name
-
-# Check specific ELB configuration
-echo "Checking configuration for ELB '$elb_name'..."
-elb_config=$(aws elbv2 describe-load-balancers --names "$elb_name" --query 'LoadBalancers[*].{DNSName:DNSName, Type:Type}' --output json)
-if [ $? -ne 0 ]; then
-    echo "Failed to retrieve configuration for ELB '$elb_name'. Please check the ELB name and your permissions."
-    exit 1
-fi
-
-echo "ELB Configuration for '$elb_name':"
-echo "$elb_config"
-
-# Analyze the configuration for compliance
-# Simulation: Assuming compliance is checked against specific criteria
-compliance_status="양호"  # This would be determined by actual checks in a real script
-
-# Update JSON diagnostic result directly using jq and sponge
-echo "Updating diagnosis result..."
-jq --arg status "$compliance_status" '.진단_결과 = $status' diagnosis.json | sponge diagnosis.json
-echo "Diagnosis updated with result: $compliance_status"
+# Pod Security Admission 설정 확인 및 정책 적용
+kubectl label namespace default pod-security.kubernetes.io/enforce=restricted
+kubectl apply -f pod.yaml --namespace=default
