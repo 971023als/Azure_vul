@@ -1,34 +1,49 @@
 #!/bin/bash
 
-# 변수 초기화
-분류="권한 관리"
-코드="2.2"
-위험도="중요도 상"
-진단_항목="네트워크 서비스 정책 관리"
-대응방안="AWS 네트워크 서비스(VPC, Route 53, Direct Connect 등)는 IAM 자격 증명에 권한 정책을 연결하여 관리되어야 합니다. 적절한 권한을 통한 체계적인 관리는 보안과 효율성을 보장합니다."
-설정방법="네트워크 서비스 별 IAM 관리자/운영자 권한 그룹 생성: 1) IAM 내 그룹 탭 접근, 2) 새로운 그룹 생성, 3) 필요한 권한 정책 연결, 4) 그룹 생성 확인"
-현황=()
-진단_결과=""
+{
+  "분류": "권한 관리",
+  "코드": "2.2",
+  "위험도": "중요도 상",
+  "진단_항목": "리소스 그룹 액세스 제어(IAM) 역할 할당",
+  "대응방안": {
+    "설명": "Azure 리소스 그룹을 효과적으로 관리하기 위해 적절한 IAM 역할 할당이 필요합니다. 이는 리소스 그룹에 리소스를 적절하게 할당하고, 관련 리소스에 대한 접근을 관리하는 데 중요한 역할을 합니다. ‘소유자’, ‘기여자’, ‘사용자 액세스 관리자’, ‘독자’ 등의 역할을 통해 리소스 그룹에 대한 접근을 세분화하여 관리할 수 있습니다.",
+    "설정방법": [
+      "Azure 포털 로그인 후 리소스 그룹 섹션으로 이동",
+      "리소스 그룹 생성 후, 필요에 따라 IAM 역할 할당",
+      "역할 할당을 위해 '역할 할당 추가' 버튼 클릭",
+      "적절한 역할과 사용자 혹은 그룹 선택 후 할당"
+    ]
+  },
+  "현황": [],
+  "진단_결과": "양호"
+}
 
-# IAM 정책 확인 및 그룹 관리
-echo "Checking IAM policies and managing groups for VPC, Route 53, and Direct Connect..."
-policy_attached=$(aws iam list-attached-group-policies --group-name NetworkAdmins --query 'AttachedPolicies[?PolicyName==`AmazonVPCFullAccess` || PolicyName==`AmazonRoute53FullAccess` || PolicyName==`AWSDirectConnectFullAccess`].PolicyName' --output text)
 
-if [ -z "$policy_attached" ]; then
-    echo "Required policies are not fully attached to the NetworkAdmins group."
-    진단_결과="취약"
-else
-    echo "Required policies are correctly attached to the NetworkAdmins group:"
-    echo "$policy_attached"
-    진단_결과="양호"
-fi
+# Ensure Azure CLI is logged in
+az login --output none
 
-# 결과 출력
-echo "분류: $분류"
-echo "코드: $코드"
-echo "위험도: $위험도"
-echo "진단_항목: $진단_항목"
-echo "대응방안: $대응방안"
-echo "설정방법: $설정방법"
-echo "현황: ${현황[@]}"
-echo "진단_결과: $진단_결과"
+# Set the resource group name and subscription ID
+resource_group="your-resource-group-name"
+subscription_id="your-subscription-id"
+az account set --subscription "$subscription_id"
+
+# Create a new resource group if necessary
+echo "Creating a new resource group..."
+az group create --name "$resource_group" --location "East US"  # Change location as needed
+
+# List current role assignments for the resource group
+echo "Current IAM role assignments for the resource group:"
+az role assignment list --resource-group "$resource_group"
+
+# Adding a new role assignment to the resource group
+echo "Adding a new role assignment..."
+role="Contributor"  # Example role, change as needed
+assignee="user-or-service-principal-id"  # Change as needed
+
+# Assign role to the resource group
+az role assignment create --assignee "$assignee" --role "$role" --resource-group "$resource_group"
+echo "Role assigned successfully to the resource group."
+
+# List updated role assignments for the resource group
+echo "Updated IAM role assignments for the resource group:"
+az role assignment list --resource-group "$resource_group"
