@@ -23,8 +23,9 @@
 
 # 진단 시작
 echo "진단 시작..."
+
 # Azure CLI를 사용하여 가상 네트워크의 보안 설정을 확인
-# 예시: az network vnet list --query "[].{name:name, subnets:subnets[].name}" --output json
+az network vnet list --query "[].{name:name, subnets:subnets[].name}" --output json
 
 # 임시 진단 결과 할당
 진단_결과="양호" # 또는 "취약"을 할당할 수 있습니다.

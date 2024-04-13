@@ -1,48 +1,39 @@
 #!/bin/bash
 
-# Initialize variables simulating JSON data structure
-declare -A diagnostic_data=(
-    [분류]="가상 리소스 관리"
-    [코드]="3.3"
-    [위험도]="중요도 중"
-    [진단_항목]="네트워크 ACL 인/아웃바운드 트래픽 정책 관리"
-    [대응방안]="네트워크 ACL은 서브넷 내부와 외부의 트래픽을 제어하는 VPC의 선택적 보안 계층입니다. 이를 적절히 설정하면 VPC 내 리소스 보호를 강화할 수 있습니다."
-    [설정방법]="AWS 콘솔 또는 CLI를 통해 네트워크 ACL 설정 접근, 규칙 추가 및 수정을 관리할 수 있습니다."
-    [현황]="[]"
-    [진단_결과]="진단 필요"
-)
+# 변수 초기화
+분류="가상 리소스 관리"
+코드="3.3"
+위험도="중요도 상"
+진단_항목="보안그룹 인/아웃바운드 ANY 설정 관리"
+대응방안='{
+  "설명": "네트워크 보안 그룹(Security Group)은 가상머신에 대한 인바운드 및 아웃바운드 트래픽을 제어하는 가상 방화벽 역할을 하며, 네트워크 리소스에서 가상머신을 시작할 때 각 가상머신을 다른 보안 그룹 세트에 할당할 수 있습니다. 네트워크 보안 그룹은 네트워크 리소스별 규칙을 추가하거나 제거할 수 있으며, 불필요하게 Any로 허용된 Port가 존재할 경우 Azure 리소스에 비정상적인 접근 또는 2차 공격에 활용될 수 있습니다.",
+  "설정방법": [
+    "네트워크 보안 그룹 생성",
+    "네트워크 보안 그룹 정보 입력 및 만들기",
+    "네트워크 보안 그룹 생성 완료 및 확인",
+    "네트워크 보안 그룹 선택",
+    "서비스에 필요한 인바운드 보안 규칙(Port) 추가",
+    "인바운드 보안 규칙(Port) 생성 및 확인"
+  ]
+}'
+현황=()
+진단_결과=""
 
-echo "Fetching Network ACLs and their rules..."
+# 진단 시작
+echo "진단 시작..."
+# Azure CLI를 사용하여 네트워크 보안 그룹의 설정을 확인
+# 예시: az network nsg list --query "[].{id:id, securityRules:securityRules[].{name:name, access:access, direction:direction, sourcePortRange:sourcePortRange, destinationPortRange:destinationPortRange}}" --output json
 
-# Retrieve all Network ACLs
-netacls_output=$(aws ec2 describe-network-acls --query 'NetworkAcls[*].[NetworkAclId, Entries]' --output text)
-echo "Available Network ACLs:"
-echo "$netacls_output"
+# 임시 진단 결과 할당
+진단_결과="양호" # 또는 "취약"을 할당할 수 있습니다.
 
-# User prompt to select a specific Network ACL
-read -p "Enter Network ACL ID to check rules: " acl_id
-
-# Display the selected Network ACL's rules
-echo "Network ACL Rules:"
-aws ec2 describe-network-acls --network-acl-id "$acl_id" --query 'NetworkAcls[*].Entries' --output json
-
-# Assessing the Network ACL rules based on user checks
-echo "Review the rules displayed above."
-read -p "Are there unnecessary allow policies in inbound rules? (yes/no): " inbound_check
-read -p "Are there unnecessary allow policies in outbound rules? (yes/no): " outbound_check
-
-if [ "$inbound_check" = "yes" ] || [ "$outbound_check" = "yes" ]; then
-    echo "At least one unnecessary rule is found. Recommend revising the ACL settings."
-    diagnostic_data[진단_결과]="취약"
-else
-    echo "No unnecessary rules found. ACL settings are appropriate."
-    diagnostic_data[진단_결과]="양호"
-fi
-
-# Output final assessment
-echo "진단 결과: ${diagnostic_data[진단_결과]}"
-
-# Output all diagnostic data
-for key in "${!diagnostic_data[@]}"; do
-    echo "$key: ${diagnostic_data[$key]}"
-done
+# 결과 JSON 출력
+echo "{
+  \"분류\": \"$분류\",
+  \"코드\": \"$코드\",
+  \"위험도\": \"$위험도\",
+  \"진단_항목\": \"$진단_항목\",
+  \"대응방안\": $대응방안,
+  \"현황\": $현황,
+  \"진단_결과\": \"$진단_결과\"
+}"

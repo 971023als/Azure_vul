@@ -1,48 +1,36 @@
 #!/bin/bash
 
-# Initialize variables simulating JSON data structure
-declare -A diagnostic_data=(
-    [분류]="가상 리소스 관리"
-    [코드]="3.4"
-    [위험도]="중요도 중"
-    [진단_항목]="라우팅 테이블 정책 관리"
-    [대응방안]="라우팅 테이블에는 네트워크 트래픽을 전달할 위치 결정 시 사용되는 규칙입니다. VPC의 각 서브넷을 라우팅 테이블에 연결해야 하며, 테이블에서는 서브넷에 대한 라우팅을 제어하게 됩니다. 기본 라우팅 테이블은 다른 라우팅 테이블과 명시적으로 연결되지 않은 모든 서브넷에 대한 라우팅을 제어합니다."
-    [설정방법]="VPC 내 라우팅 테이블 탭 접근 후 라우팅 편집 클릭, 라우팅 테이블 설정 및 저장"
-    [진단_기준]="양호기준: 라우팅 테이블 내 ANY 정책이 설정되어 있지 않고 서비스 타깃 별로 설정되어 있을 경우, 취약기준: 라우팅 테이블 내 ANY 정책이 설정되어 있거나 서비스 타깃 별로 설정되어 있지 않을 경우"
-    [현황]="[]"
-    [진단_결과]="진단 필요"
-)
+# 변수 초기화
+분류="가상 리소스 관리"
+코드="3.4"
+위험도="중요도 중"
+진단_항목="보안그룹 인/아웃바운드 불필요 정책 관리"
+대응방안='{
+  "설명": "네트워크 보안 그룹은 네트워크 규칙(Source, Destination)을 추가하거나 제거가 가능하며, 인바운드 및 아웃바운드 트래픽에 적용됩니다. 불필요한 정책이 존재할 경우 Azure 리소스에 비정상적인 접근 또는 2차 공격에 활용될 수 있습니다.",
+  "설정방법": [
+    "네트워크 보안 그룹 선택",
+    "서비스에 필요한 인바운드 보안 규칙(IP Address) 추가",
+    "필요하지 않은 규칙 확인 및 제거"
+  ]
+}'
+현황=()
+진단_결과=""
 
-echo "Fetching Routing Tables..."
+# 진단 시작
+echo "진단 시작..."
+# Azure CLI를 사용하여 네트워크 보안 그룹의 현재 설정을 검사
+# 예시: az network nsg rule list --nsg-name <NameOfSecurityGroup> --resource-group <NameOfResourceGroup> --query "[].{name:name, sourceAddressPrefix:sourceAddressPrefix, destinationAddressPrefix:destinationAddressPrefix, access:access, direction:direction}" --output json
 
-# Retrieve all Routing Tables
-routing_tables_output=$(aws ec2 describe-route-tables --query 'RouteTables[*].[RouteTableId, Routes]' --output text)
-echo "Available Routing Tables:"
-echo "$routing_tables_output"
+# 임시 진단 결과 할당
+진단_결과="양호" # 또는 "취약"을 할당할 수 있습니다. 기준에 따라 검사 후 결정
 
-# User prompt to select a specific Routing Table
-read -p "Enter Routing Table ID to check policies: " rt_id
-
-# Display the selected Routing Table's policies
-echo "Routing Table Policies:"
-aws ec2 describe-route-tables --route-table-id "$rt_id" --query 'RouteTables[*].Routes' --output json
-
-# Assessing the Routing Table policies based on user checks
-echo "Review the policies displayed above."
-read -p "Does this Routing Table contain ANY policies or lacks service target specific policies? (yes/no): " policy_check
-
-if [ "$policy_check" = "yes" ]; then
-    echo "Routing Table contains ANY policies or lacks service target specific policies. It is vulnerable."
-    diagnostic_data[진단_결과]="취약"
-else
-    echo "Routing Table policies are appropriate without ANY policies and are service target specific. It is satisfactory."
-    diagnostic_data[진단_결과]="양호"
-fi
-
-# Output final assessment
-echo "진단 결과: ${diagnostic_data[진단_결과]}"
-
-# Output all diagnostic data
-for key in "${!diagnostic_data[@]}"; do
-    echo "$key: ${diagnostic_data[$key]}"
-done
+# 결과 JSON 출력
+echo "{
+  \"분류\": \"$분류\",
+  \"코드\": \"$코드\",
+  \"위험도\": \"$위험도\",
+  \"진단_항목\": \"$진단_항목\",
+  \"대응방안\": $대응방안,
+  \"현황\": $현황,
+  \"진단_결과\": \"$진단_결과\"
+}"
