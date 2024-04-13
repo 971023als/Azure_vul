@@ -1,43 +1,55 @@
 #!/bin/bash
 
-# 변수 초기화
-분류="권한 관리"
-코드="1.7"
-위험도="중요도 중"
-진단_항목="Admin Console 관리자 정책 관리"
-대응방안="AWS Cloud 사용을 위해 처음 발급한 계정은 IAM 사용자 계정과 달리 모든 서비스에 접근할 수 있는 최고 관리자 계정입니다. Cloud 서비스 특성 상 인터넷 연결이 가능한 망에서 계정정보를 입력하여 WEB Console에 접근하게 됩니다. 이는 최고 권한을 보유하고 있는 관리자 계정이 아닌 권한이 조정된 IAM 사용자 계정을 기본으로 사용해야 보다 안전한 접근이 이뤄질 수 있습니다."
-설정방법="IAM 사용자 계정 생성: 1) 사용자 추가 버튼 클릭, 2) 사용자 추가 (기본설정 - 이름, 액세스 유형 선택), 3) 사용자 추가 (기존 정책 직접 연결하기), 4) 사용자 추가 (태그 계정 정보 입력), 5) 사용자 추가 (검토하기), 6) IAM 사용자에 추가된 신규 사용자 확인, 7) 사용자 권한 확인"
-현황=()
-진단_결과=""
+{
+  "분류": "계정 관리",
+  "코드": "1.7",
+  "위험도": "중요도 상",
+  "진단_항목": "MFA (Multi-Factor Authentication) 설정",
+  "대응방안": {
+    "설명": "MFA(2차 인증방식)의 보안은 계층화된 접근 방식을 기반으로 합니다. MFA는 일반 사용자에게도 사용을 통해 관리계정 보안을 향상시킬 수 있으며 특히 관리자 계정에 MFA를 설정할 경우 Azure 리소스 생성/관리보안도 함께 강화할 수 있습니다.",
+    "설정방법": [
+      "Azure Active Directory 메뉴 내 사용자 기능 선택",
+      "모든 사용자 메뉴 내 사용자 별 MFA 선택",
+      "다단계 인증 내 MFA를 사용할 사용자 선택 및 사용 버튼 클릭",
+      "AD 계정으로 Azure 로그인 시도",
+      "MFA에 사용될 Microsoft Authenticator 앱 시작하기",
+      "모바일 앱 설치 후 QR 코드 스캔",
+      "모바일 앱 인증 알림 승인 완료",
+      "AD 계정으로 Azure 로그인 재 진행",
+      "휴대폰으로 발송된 요청 승인 시 MFA를 통한 로그인 가능"
+    ]
+  },
+  "현황": [],
+  "진단_결과": "양호"
+}
 
-echo "IAM 사용자 계정 생성 절차를 시작합니다."
 
-# IAM 사용자 계정 생성 프로세스
-# 사용자 입력을 통한 계정 생성 시뮬레이션 (실제 AWS CLI 명령은 아님)
-read -p "Enter new IAM user name: " user_name
-echo "Creating IAM user: $user_name"
-echo "$user_name user created successfully."
+# Log in to Azure
+az login --output none
 
-# 사용자 권한 설정 시뮬레이션
-read -p "Attach policy to the user (e.g., AdministratorAccess, ReadOnlyAccess): " policy_name
-echo "Attaching policy $policy_name to $user_name"
-echo "Policy $policy_name attached successfully."
+# Fetch the status of MFA settings for all users
+echo "Checking MFA settings for all users..."
+mfa_status=$(az ad user list --query "[].{name:displayName, mfaEnabled:signInActivity.mfaEnabled}" --output json)
 
-# 진단 결과 설정
-read -p "Is the Admin Console account used for service purposes? (yes/no): " service_use
-
-if [ "$service_use" = "yes" ]; then
-    진단_결과="취약"
-else
-    진단_결과="양호"
+if [ $? -ne 0 ]; then
+    echo "Failed to retrieve MFA settings."
+    exit 1
 fi
 
-# 결과 출력
-echo "분류: $분류"
-echo "코드: $코드"
-echo "위험도: $위험도"
-echo "진단_항목: $진단_항목"
-echo "대응방안: $대응방안"
-echo "설정방법: $설정방법"
-echo "현황: ${현황[@]}"
-echo "진단_결과: $진단_결과"
+echo "MFA settings for users:"
+echo "$mfa_status"
+
+# Verify MFA status for a specific user
+read -p "Enter the username to check specific MFA status: " username
+user_mfa_status=$(az ad user show --id "$username" --query "{name:displayName, mfaEnabled:signInActivity.mfaEnabled}" --output json)
+
+if [[ $(echo $user_mfa_status | jq '.mfaEnabled') == "true" ]]; then
+    echo "MFA is enabled for $username."
+    diagnosis_result="양호"
+else
+    echo "MFA is not enabled for $username."
+    diagnosis_result="취약"
+fi
+
+# Update JSON diagnosis result dynamically
+sed -i "s/\"진단_결과\": \"양호\"/\"진단_결과\": \"$diagnosis_result\"/" <path_to_json_file>
